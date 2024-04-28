@@ -1,6 +1,8 @@
+import csv
 from datetime import datetime
 from random import randrange
 
+import click
 from flask import Flask, abort, redirect, render_template, url_for, flash
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
@@ -18,6 +20,7 @@ app.config['SECRET_KEY'] = (
 )
 
 db = SQLAlchemy(app)
+
 migrate = Migrate(app, db)
 
 
@@ -58,6 +61,7 @@ def page_not_found(error):
 
 @app.errorhandler(500)
 def internal_error(error):
+    db.session.rollback()
     return render_template('500.html'), 500
 
 
@@ -93,6 +97,20 @@ def add_opinion_view():
         return redirect(url_for('opinion_view', id=opinion.id))
 
     return render_template('add_opinion.html', form=form)
+
+
+@app.cli.command('load_opinions')
+def load_opinions_command():
+    """Функция загрузки мнений в базу данных."""
+    with open('opinions.csv', encoding='utf-8') as file:
+        reader = csv.DictReader(file)
+        counter = 0
+        for row in reader:
+            opinion = Opinion(**row)
+            db.session.add(opinion)
+            db.session.commit()
+            counter += 1
+    click.echo(f'Загружено мнений: {counter}')
 
 
 @app.route('/opinion/<int:id>')
